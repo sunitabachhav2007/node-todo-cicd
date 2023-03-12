@@ -1,0 +1,72 @@
+pipeline {
+    agent any
+    stages {
+        stage('gitclone'){
+            steps{
+                git 'https://github.com/bhaskarteja14529/node-todo-cicd.git'
+            } 
+        }
+
+         stage('Build and Test'){
+            steps{
+                 sh 'docker build -t bhaskarteja .'
+                 sh 'docker images'    
+            }
+        }
+
+        stage ('login'){
+            steps{
+                 withCredentials([string(credentialsId: 'Doc_pas', variable: 'PASSWORD')]) {
+                 sh 'docker login -u bhaskarteja14529 -p $PASSWORD'
+                 }
+           }
+        }
+        stage ('push'){
+            steps{
+                 sh 'docker push bhaskarteja14529/node-todo-cicd:latest'
+                }
+        }
+
+        stage('Push Docker Image to ECR') {
+            steps {
+                withAWS(credentials: 'AWS_ACCESS', region: 'us-west-2') {
+                    sh 'aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 639184174275.dkr.ecr.us-west-2.amazonaws.com'
+                    sh 'docker tag bhaskarteja:latest 639184174275.dkr.ecr.us-west-2.amazonaws.com/bhaskarteja:latest'
+                    sh 'docker push 639184174275.dkr.ecr.us-west-2.amazonaws.com/bhaskarteja:latest'
+                }
+            }
+        }
+
+        stage('Integrate Jenkins with EKS Cluster and Deploy App') {
+            steps {
+                withAWS(credentials: 'AWS_ACCESS', region: 'us-west-2') {
+                  script {
+                    sh ('aws eks update-kubeconfig --name first-eks-cluster1 --region us-west-2')
+                    sh "kubectl apply -f deployment.yml"
+                }
+                }
+        }
+    }
+
+}
+
+}
+
+
+
+
+//docker tag bhaskarteja:latest 639184174275.dkr.ecr.us-west-2.amazonaws.com/bhaskarteja:latest
+
+
+/*
+
+        stage('Push image') {
+            steps{
+                docker.withRegistry('https://registry.hub.docker.com', 'DOCKER_HUB_LINK') {
+                app.push("${env.BUILD_NUMBER}")
+               }
+            }          
+        }
+*/
+
+   
